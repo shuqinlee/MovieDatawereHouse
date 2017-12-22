@@ -1,1 +1,2 @@
-Processed: '/Users/shuqinlee/Documents/Programming/Python/Scrapy/processed_1222_02.txt'
+Processed: 'processed.txt'
+Input: 'amazon_addr2.txt'

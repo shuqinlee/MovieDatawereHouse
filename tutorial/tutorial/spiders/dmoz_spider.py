@@ -4,6 +4,7 @@ import scrapy
 import logging
 from tutorial.items import AmazonItem
 import re
+import os
 			
 class AmazonSpider(scrapy.Spider):
 	name = "amazon"
@@ -18,13 +19,17 @@ class AmazonSpider(scrapy.Spider):
 		l = config.readline()
 		self.processed = re.findall('Processed:.*?\'(.*?)\'', l)[0]
 		logging.info("Processed file configured: " + self.processed)
-		processedFile = open(self.processed, 'r')
-		f = open("amazon_addr.txt", "r")
+		processedFile = open(self.processed, 'a+')
+
+		l = config.readline()
+		inFile = re.findall('Input:.*?\'(.*?)\'', l)[0]
+		f = open(inFile, "r")
 		i = 0
 		for line in f:
 			i += 1
 			print("*******" + str(i) + "******")
-			if i == 1000: break
+			if i == 100: break
+			processedFile.seek(0, os.SEEK_SET)
 			if line in processedFile.readlines(): # check whether processed
 				continue
 			nexturl = line.strip()
