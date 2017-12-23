@@ -27,8 +27,8 @@ class AmazonSpider(scrapy.Spider):
 		i = 0
 		for line in f:
 			i += 1
-			print("*******" + str(i) + "******")
-			if i == 100: break
+#			print("*******" + str(i) + "******")
+#			if i == 100: break
 			processedFile.seek(0, os.SEEK_SET)
 			if line in processedFile.readlines(): # check whether processed
 				continue
@@ -57,7 +57,6 @@ class AmazonSpider(scrapy.Spider):
 		fieldRes = re.findall(fieldPtn, html)
 		fieldDict = dict()
 		if fieldRes:
-			pass
 			for s in fieldRes:
 				key = s[0].strip()
 				content = s[1].strip()
@@ -104,8 +103,8 @@ class AmazonSpider(scrapy.Spider):
 			avgRatingRes = re.findall(avgRatingPtn, html)
 			fieldDict["average_rating"] = avgRatingRes
 			item["average_rating"] = avgRatingRes
-			
 			item["ptype"] = 0
+			item["oid"] = re.findall("https://www.amazon.com/dp/(.*?)/", response.url)[0]
 			self.write_processed(response)
 			yield item
 		else:
@@ -162,6 +161,7 @@ class AmazonSpider(scrapy.Spider):
 			fieldDict["average_rating"] = avgRatingRes
 			item["average_rating"] = avgRatingRes
 			item["ptype"] = 1
+			item["oid"] = re.findall("https://www.amazon.com/dp/(.*?)/", response.url)[0]
 			self.write_processed(response)
 			
 #			print "******** FINAL RESULT TYPE 2 ********"

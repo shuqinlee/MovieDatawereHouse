@@ -25,3 +25,4 @@ class AmazonItem(scrapy.Item):
     dvd_release_date = scrapy.Field()
     average_rating = scrapy.Field()
     ptype = scrapy.Field()
+    oid = scrapy.Field()
