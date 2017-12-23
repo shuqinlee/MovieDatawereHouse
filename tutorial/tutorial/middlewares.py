@@ -4,9 +4,10 @@
 #
 # See documentation in:
 # http://doc.scrapy.org/en/latest/topics/spider-middleware.html
-
+import scrapy
 from scrapy import signals
-
+import random 
+import logging
 
 class TutorialSpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
@@ -54,3 +55,38 @@ class TutorialSpiderMiddleware(object):
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
+
+"""
+class ProxyMiddleWare(object):  
+    """docstring for ProxyMiddleWare"""  
+    def process_request(self,request, spider):  
+        '''add proxy for request'''  
+        proxy = self.get_random_proxy()  
+        logging.info("Request IP: %s", proxy)
+#        print("this is request ip:"+proxy)  
+        request.meta['proxy'] = proxy   
+  
+  
+    def process_response(self, request, response, spider):  
+        '''resolve response'''  
+        # if response status is not 200, randomize IP again 
+        if response.status != 200:  
+            proxy = self.get_random_proxy()  
+            logging.info("Request IP: " + proxy)
+            # add proxy for current request  
+            request.meta['proxy'] = proxy   
+            return request  
+        return response  
+  
+    def get_random_proxy(self):  
+        '''randomize proxy from txt file'''  
+        while 1:  
+            with open('proxies.txt', 'r') as f:  
+                proxies = f.readlines()  
+            if proxies:  
+                break  
+            else:  
+                time.sleep(1)  
+        proxy = random.choice(proxies).strip()  
+        return proxy
+        """
