@@ -140,10 +140,16 @@ class AmazonSpider(scrapy.Spider):
 					key = "mpaa_rating"
 					ratePat = r'.*?<span class="a-size-small">(.*?)</span>.*?<span class="a-letter-space"></span>.*?</div>.*?</div>(.*$)'
 					rateRes = re.search(ratePat, val)
-					abbr = rateRes.group(1).strip()
-					full = rateRes.group(2).strip()
-					fieldDict[key] = [abbr + " (" + full + ")"]
-					item[key] = [abbr + " (" + full + ")"]
+					if rateRes is None: 
+						ratePat = r'<img.*?src=".*?".*?width=".*?".*?align=".*?".*?alt="(.*?)".*?height=".*?".*?border=".*?".*?>'
+						rateRes = re.search(ratePat, val)
+						item[key] = rateRes.group(1).lower().strip()
+						fieldDict[key] = rateRes.group(1).lower().strip()
+					else:
+						abbr = rateRes.group(1).strip()
+						full = rateRes.group(2).strip()
+						fieldDict[key] = [abbr + " (" + full + ")"]
+						item[key] = [abbr + " (" + full + ")"]
 					continue
 				
 				linkPat = r'<a.*?>(.*?)</a>'
@@ -156,7 +162,7 @@ class AmazonSpider(scrapy.Spider):
 #					print(val)
 					fieldDict[key] = [val.strip()]	
 					item[key] = [val.strip()]
-			avgRatingPtn = r'<span id="acrPopover" class="reviewCountTextLinkedHistogram noUnderline" title="(.*?)"> '
+			avgRatingPtn = r'<span.*?id="acrPopover".*?class="reviewCountTextLinkedHistogram noUnderline".*?title="(.*?)".*?>'
 			avgRatingRes = re.findall(avgRatingPtn, html)
 			fieldDict["average_rating"] = avgRatingRes
 			item["average_rating"] = avgRatingRes
