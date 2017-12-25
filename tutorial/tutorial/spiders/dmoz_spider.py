@@ -27,10 +27,12 @@ class AmazonSpider(scrapy.Spider):
 		i = 0
 		for line in f:
 			i += 1
-#			print("*******" + str(i) + "******")
+			line = str(line.strip())
 #			if i == 100: break
 			processedFile.seek(0, os.SEEK_SET)
-			if line in processedFile.readlines(): # check whether processed
+			
+			if str(line) + "\n" in processedFile.xreadlines(): # check whether processed
+				print("processed!!")
 				continue
 			nexturl = line.strip()
 			yield scrapy.Request(nexturl, callback=self.parse_contents)
@@ -43,6 +45,24 @@ class AmazonSpider(scrapy.Spider):
 		f.write(url + "\n")
 		f.close()
 
+	def transfer_runtime(self, origin):
+		pat = '(.*?) hour.*?(\d+) minute'
+		res = re.search(pat, origin)
+		minute = 0
+		if res:
+			hour = int(res.group(1))
+			minute = int(res.group(2))
+			minute = hour * 60 + minute
+		else:
+			pat = r"(\d+) minute"
+			res = re.search(pat, origin)
+			minute = int(res.group(1))
+		return minute
+	def transfer_rating(self, origin):
+		ratingPtn = r"^(.*?) out"
+		ratingRes = re.search(ratingPtn, origin)
+		return float(ratingRes.group(1))
+		
 	def parse_contents(self, response):
 		item = AmazonItem()
 		html = response.body.replace("\n", "")
@@ -64,29 +84,23 @@ class AmazonSpider(scrapy.Spider):
 
 				if key in KEYWORDS:
 					fieldDict[key] = content
-	#		print("******* field dict: *******")
-	#		print fieldDict # {'Generes': '<a href=...></a>...'}
 
 			for key, value in fieldDict.items():
+
 				contentPtn = r'<a .*?>(.*?)</a>'
 				contentRes = re.findall(contentPtn, value) 
+					
 				if not contentRes:
-					fieldDict[key] = [value]
-					item[key] = [value]
+					fieldDict[key] = value
+					item[key] = value
 				else:
 					contentRes = map(lambda x: x.strip(), contentRes)
 					fieldDict[key] = contentRes
 					item[key] = contentRes
-
-#			print "******** FINAL RESULT TYPE 1 ********"
-#			for key, value in fieldDict.items():
-#				print(key)
-#				print(value)
-#				print("**************")
 				
 			# desc
 			desc = str(response.xpath("//div[@class='dv-info']/div/p/text()").extract())
-			item["desc"] = [str(desc)]
+			item["desc"] = str(desc)
 			
 			# runtime
 			timepat = re.compile(r"<dt>.*?Runtime:.*?</dt>.*?<dd>(.*?)</dd>")
@@ -95,40 +109,41 @@ class AmazonSpider(scrapy.Spider):
 			timeres = timepat.search(dl)
 			if timeres:
 				runtime = str(timeres.group(1).strip()) # the original was in unicode
-				item["runtime"] = [runtime]
+				item["runtime"] = self.transfer_runtime(runtime)
 			
 			# avg_rating
 			avgRatingPtn = r'<span id="acrPopover" class="reviewCountTextLinkedHistogram noUnderline" title="(.*?)"> '
 			avgRatingPtn = r'<span data-hook="rating-out-of-text" class="arp-rating-out-of-text">(.*?)</span>'
 			avgRatingRes = re.findall(avgRatingPtn, html)
-			fieldDict["average_rating"] = avgRatingRes
-			item["average_rating"] = avgRatingRes
+			item["average_rating"] = self.transfer_rating(avgRatingRes[0])
 			item["ptype"] = 0
 			item["oid"] = re.findall("https://www.amazon.com/dp/(.*?)/", response.url)[0]
+			
+			# name
+			name = response.xpath("//h1[@id='aiv-content-title']/text()").extract()[0]
+			name = name.replace("\n", "")
+			name = name.strip()
+			logging.info("Name: %s", name)
+			item["name"] = name
 			self.write_processed(response)
 			yield item
 		else:
-			KEYWORDS = {"actors", "directors", "producers", "writers", "language", "number_of_discs", "number_of_tapes", "rated", "studio", "dvd_release_date", "run_time", "average_rating"}
-			# to-do
+			KEYWORDS = {"actors", "directors", "language", "rated", "studio", "dvd_release_date", "run_time", "average_rating", "amazon_best_sellers_rank"}
+
 			detailsPat = r'<h2>Product details</h2>.*?<div class="content">.*?<ul>(.*?)</ul>.*?</div>'
 			detailsRes = re.findall(detailsPat, html)
 			if not detailsRes:
 				return
-#			print detailsRes
-			fieldPat = r'<li>.*?<b>(.*?):.*?</b>(.*?)</li>'
+
+			fieldPat = r'<li.*?>.*?<b>(.*?):.*?</b>(.*?)</li>'
 			fieldRes = re.findall(fieldPat, detailsRes[0])
-#			print("***** TYPE 2.2 *****")
-#			print(fieldRes)
+
 			for field in fieldRes:
 				key = field[0].lower().replace(" ", "_").strip()
-				
 				val = field[1].strip()
-#				print(key)
-#				print(val)
+
 				if key not in KEYWORDS:
 					continue
-#				print("***** TYPE 2.3 *****")
-#				print field
 				
 				if key == "actors":
 					key = "supporting_actors"
@@ -136,37 +151,53 @@ class AmazonSpider(scrapy.Spider):
 					key = "director"
 				elif key == "run_time":
 					key = "runtime"
+					item["runtime"] = self.transfer_runtime(val)
+					continue
+				elif key == "amazon_best_sellers_rank":
+					rankPat = r"#([1-9][\d]{0,2}[,\d{3}]*).*?in Movies"
+					res = re.search(rankPat, val)
+					if res:
+						item["rank"] = int(res.group(1).replace(",", ""))
+						continue
 				elif key == "rated":
 					key = "mpaa_rating"
 					ratePat = r'.*?<span class="a-size-small">(.*?)</span>.*?<span class="a-letter-space"></span>.*?</div>.*?</div>(.*$)'
 					rateRes = re.search(ratePat, val)
-					abbr = rateRes.group(1).strip()
-					full = rateRes.group(2).strip()
-					fieldDict[key] = [abbr + " (" + full + ")"]
-					item[key] = [abbr + " (" + full + ")"]
+					if rateRes is None: 
+						ratePat = r'<img.*?src=".*?".*?width=".*?".*?align=".*?".*?alt="(.*?)".*?height=".*?".*?border=".*?".*?>'
+						rateRes = re.search(ratePat, val)
+						item[key] = rateRes.group(1).lower().strip()
+						fieldDict[key] = rateRes.group(1).lower().strip()
+					else:
+						abbr = rateRes.group(1).strip()
+						full = rateRes.group(2).strip()
+						fieldDict[key] = abbr + " (" + full + ")"
+						item[key] = abbr + " (" + full + ")"
 					continue
 				
 				linkPat = r'<a.*?>(.*?)</a>'
 				linkRes = re.findall(linkPat, val)
-#				print linkRes
 				if linkRes:
 					fieldDict[key] = linkRes
+					item[key] = linkRes
 				else:
-#					print("***** TYPE 2.4 *****")
-#					print(val)
-					fieldDict[key] = [val.strip()]	
-					item[key] = [val.strip()]
+					fieldDict[key] = val.strip()	
+					item[key] = val.strip()
+			# avgRating
 			avgRatingPtn = r'<span id="acrPopover" class="reviewCountTextLinkedHistogram noUnderline" title="(.*?)"> '
 			avgRatingRes = re.findall(avgRatingPtn, html)
-			fieldDict["average_rating"] = avgRatingRes
-			item["average_rating"] = avgRatingRes
+
+			item["average_rating"] = self.transfer_rating(avgRatingRes[0]) 
+			# ptype
 			item["ptype"] = 1
+			# oid
 			item["oid"] = re.findall("https://www.amazon.com/dp/(.*?)/", response.url)[0]
-			self.write_processed(response)
+			# name
+			namePtn = r'<span.*?id="productTitle".*?class="a-size-large".*?>(.*?)<'
+			nameRes = re.search(namePtn, html)
+			item["name"] = nameRes.group(1).strip()
 			
-#			print "******** FINAL RESULT TYPE 2 ********"
-#			for key, value in fieldDict.items():
-#				print(key)
-#				print(value)
-#				print("**************")
+			
+			self.write_processed(response)
+
 			yield item

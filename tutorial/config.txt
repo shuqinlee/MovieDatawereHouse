@@ -1,2 +1,2 @@
-Processed: 'processed4.txt'
-Input: 'amazon_addr4.txt'
+Processed: 'processed6.txt'
+Input: 'amazon_addr6.txt'
