@@ -32,7 +32,6 @@ class AmazonSpider(scrapy.Spider):
 			processedFile.seek(0, os.SEEK_SET)
 			
 			if str(line) + "\n" in processedFile.xreadlines(): # check whether processed
-				print("processed!!")
 				continue
 			nexturl = line.strip()
 			yield scrapy.Request(nexturl, callback=self.parse_contents)
@@ -46,18 +45,17 @@ class AmazonSpider(scrapy.Spider):
 		f.close()
 
 	def transfer_runtime(self, origin):
-		pat = '(.*?) hour.*?(\d+) minute'
-		res = re.search(pat, origin)
+		hourPat = '(.*?) hour'
+		minutePat = '(\d*) minute'
+		hourRes = re.search(hourPat, origin)
+		hour = 0
+		if hourRes:
+			hour = float(hourRes.group(1))
+		minuteRes = re.search(minutePat, origin)
 		minute = 0
-		if res:
-			hour = int(res.group(1))
-			minute = int(res.group(2))
-			minute = hour * 60 + minute
-		else:
-			pat = r"(\d+) minute"
-			res = re.search(pat, origin)
-			minute = int(res.group(1))
-		return minute
+		if minuteRes:
+			minute = float(minuteRes.group(1))
+		return hour * 60 + minute
 	def transfer_rating(self, origin):
 		ratingPtn = r"^(.*?) out"
 		ratingRes = re.search(ratingPtn, origin)
@@ -115,7 +113,8 @@ class AmazonSpider(scrapy.Spider):
 			avgRatingPtn = r'<span id="acrPopover" class="reviewCountTextLinkedHistogram noUnderline" title="(.*?)"> '
 			avgRatingPtn = r'<span data-hook="rating-out-of-text" class="arp-rating-out-of-text">(.*?)</span>'
 			avgRatingRes = re.findall(avgRatingPtn, html)
-			item["average_rating"] = self.transfer_rating(avgRatingRes[0])
+			if avgRatingRes:
+				item["average_rating"] = self.transfer_rating(avgRatingRes[0])
 			item["ptype"] = 0
 			item["oid"] = re.findall("https://www.amazon.com/dp/(.*?)/", response.url)[0]
 			
@@ -186,8 +185,8 @@ class AmazonSpider(scrapy.Spider):
 			# avgRating
 			avgRatingPtn = r'<span id="acrPopover" class="reviewCountTextLinkedHistogram noUnderline" title="(.*?)"> '
 			avgRatingRes = re.findall(avgRatingPtn, html)
-
-			item["average_rating"] = self.transfer_rating(avgRatingRes[0]) 
+			if avgRatingRes:
+				item["average_rating"] = self.transfer_rating(avgRatingRes[0]) 
 			# ptype
 			item["ptype"] = 1
 			# oid
