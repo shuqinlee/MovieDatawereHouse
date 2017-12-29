@@ -157,7 +157,7 @@ class AmazonSpider(scrapy.Spider):
 					res = re.search(rankPat, val)
 					if res:
 						item["rank"] = int(res.group(1).replace(",", ""))
-						continue
+					continue
 				elif key == "rated":
 					key = "mpaa_rating"
 					ratePat = r'.*?<span class="a-size-small">(.*?)</span>.*?<span class="a-letter-space"></span>.*?</div>.*?</div>(.*$)'
